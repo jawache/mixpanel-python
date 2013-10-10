@@ -3,6 +3,7 @@ import json
 import time
 import urllib
 import urllib2
+from google.appengine.api import urlfetch
 
 '''
 The mixpanel package allows you to easily track events and
@@ -276,8 +277,9 @@ class Consumer(object):
             'ip':0,
         })
         try:
-            request = urllib2.Request(request_url, data)
-            response = urllib2.urlopen(request).read()
+            request = "http://api.mixpanel.com/track/?data=" + data
+            rpc = urlfetch.create_rpc()
+            response = urlfetch.make_fetch_call(rpc, request)
         except urllib2.HTTPError as e:
             raise MixpanelException(e)
 
