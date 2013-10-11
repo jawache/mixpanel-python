@@ -3,7 +3,13 @@ import json
 import time
 import urllib
 import urllib2
-from google.appengine.api import urlfetch
+import hashlib
+
+try:
+    import json
+except ImportError:
+    import simplejson as json
+
 
 '''
 The mixpanel package allows you to easily track events and
@@ -17,6 +23,7 @@ customize the IO characteristics of their tracking.
 '''
 
 VERSION = '3.0.0'
+
 
 class Mixpanel(object):
     '''
@@ -59,7 +66,7 @@ class Mixpanel(object):
           })
         """
         all_properties = {
-            'token' : self._token,
+            'token': self._token,
             'distinct_id': distinct_id,
             'time': int(self._now()),
             'mp_lib': 'python',
@@ -100,9 +107,9 @@ class Mixpanel(object):
                                     'Birthday': '1948-01-01'})
         """
         return self.people_update({
-            '$distinct_id': distinct_id,
-            '$set': properties,
-        }, meta=meta)
+                                      '$distinct_id': distinct_id,
+                                      '$set': properties,
+                                  }, meta=meta)
 
     def people_set_once(self, distinct_id, properties, meta={}):
         """
@@ -115,9 +122,9 @@ class Mixpanel(object):
             mp.people_set_once('12345', {'First Login': "2013-04-01T13:20:00"})
         """
         return self.people_update({
-            '$distinct_id': distinct_id,
-            '$set_once': properties,
-        }, meta=meta)
+                                      '$distinct_id': distinct_id,
+                                      '$set_once': properties,
+                                  }, meta=meta)
 
     def people_increment(self, distinct_id, properties, meta={}):
         """
@@ -130,9 +137,9 @@ class Mixpanel(object):
             mp.people_add('12345', {'Coins Gathered': 12})
         """
         return self.people_update({
-            '$distinct_id': distinct_id,
-            '$add': properties,
-        }, meta=meta)
+                                      '$distinct_id': distinct_id,
+                                      '$add': properties,
+                                  }, meta=meta)
 
     def people_append(self, distinct_id, properties, meta={}):
         """
@@ -146,9 +153,9 @@ class Mixpanel(object):
             mp.people_append('12345', { "Power Ups": "Bubble Lead" })
         """
         return self.people_update({
-            '$distinct_id': distinct_id,
-            '$append': properties,
-        }, meta=meta)
+                                      '$distinct_id': distinct_id,
+                                      '$append': properties,
+                                  }, meta=meta)
 
     def people_union(self, distinct_id, properties, meta={}):
         """
@@ -161,9 +168,9 @@ class Mixpanel(object):
             mp.people_union('12345', { "Items purchased": ["socks", "shirts"] } )
         """
         return self.people_update({
-            '$distinct_id': distinct_id,
-            '$union': properties,
-        }, meta=meta)
+                                      '$distinct_id': distinct_id,
+                                      '$union': properties,
+                                  }, meta=meta)
 
     def people_unset(self, distinct_id, properties, meta={}):
         """
@@ -175,9 +182,9 @@ class Mixpanel(object):
             mp.people_unset('12345', ["Days Overdue"])
         """
         return self.people_update({
-            '$distinct_id': distinct_id,
-            '$unset': properties,
-        }, meta=meta)
+                                      '$distinct_id': distinct_id,
+                                      '$unset': properties,
+                                  }, meta=meta)
 
     def people_delete(self, distinct_id, meta={}):
         """
@@ -189,9 +196,9 @@ class Mixpanel(object):
             mp.people_delete('12345')
         """
         return self.people_update({
-            '$distinct_id': distinct_id,
-            '$delete': "",
-        }, meta=meta)
+                                      '$distinct_id': distinct_id,
+                                      '$delete': "",
+                                  }, meta=meta)
 
     def people_track_charge(self, distinct_id, amount, properties={}, meta={}):
         """
@@ -229,6 +236,7 @@ class Mixpanel(object):
         record.update(meta)
         self._consumer.send('people', json.dumps(record))
 
+
 class MixpanelException(Exception):
     '''
     MixpanelExceptions will be thrown if the server can't recieve
@@ -237,12 +245,14 @@ class MixpanelException(Exception):
     '''
     pass
 
+
 class Consumer(object):
     '''
     The simple consumer sends an HTTP request directly to the Mixpanel service,
     with one request for every call. This is the default consumer for Mixpanel
     objects- if you don't provide your own, you get one of these.
     '''
+
     def __init__(self, events_url=None, people_url=None):
         self._endpoints = {
             'events': events_url or 'https://api.mixpanel.com/track',
@@ -268,18 +278,19 @@ class Consumer(object):
         if endpoint in self._endpoints:
             self._write_request(self._endpoints[endpoint], json_message)
         else:
-            raise MixpanelException('No such endpoint "{0}". Valid endpoints are one of {1}'.format(self._endpoints.keys()))
+            raise MixpanelException(
+                'No such endpoint "{0}". Valid endpoints are one of {1}'.format(self._endpoints.keys()))
 
     def _write_request(self, request_url, json_message):
         data = urllib.urlencode({
             'data': base64.b64encode(json_message),
-            'verbose':1,
-            'ip':0,
+            'verbose': 1,
+            'ip': 0,
         })
+
         try:
-            request = "http://api.mixpanel.com/track/?data=" + data
-            rpc = urlfetch.create_rpc()
-            response = urlfetch.make_fetch_call(rpc, request)
+            request = urllib2.Request(request_url, data)
+            response = urllib2.urlopen(request).read()
         except urllib2.HTTPError as e:
             raise MixpanelException(e)
 
@@ -291,7 +302,23 @@ class Consumer(object):
         if response['status'] != 1:
             raise MixpanelException('Mixpanel error: {0}'.format(response['error']))
 
+        #try:
+        #    request = request_url + "/?data=" + data
+        #    rpc = urlfetch.create_rpc()
+        #    urlfetch.make_fetch_call(rpc, request)
+        #except urllib2.HTTPError as e:
+        #    raise MixpanelException(e)
+
+        #try:
+        #    response = json.loads(response)
+        #except ValueError:
+        #    raise MixpanelException('Cannot interpret Mixpanel server response: {0}'.format(response))
+        #
+        #if response['status'] != 1:
+        #    raise MixpanelException('Mixpanel error: {0}'.format(response['error']))
+
         return True
+
 
 class BufferedConsumer(object):
     '''
@@ -303,6 +330,7 @@ class BufferedConsumer(object):
     when you're sure you're done sending them. calls to flush() will
     send all remaining unsent events being held by the BufferedConsumer.
     '''
+
     def __init__(self, max_size=50, events_url=None, people_url=None):
         self._consumer = Consumer(events_url, people_url)
         self._buffers = {
@@ -328,7 +356,8 @@ class BufferedConsumer(object):
         :raises: MixpanelException
         '''
         if endpoint not in self._buffers:
-            raise MixpanelException('No such endpoint "{0}". Valid endpoints are one of {1}'.format(self._buffers.keys()))
+            raise MixpanelException(
+                'No such endpoint "{0}". Valid endpoints are one of {1}'.format(self._buffers.keys()))
 
         buf = self._buffers[endpoint]
         buf.append(json_message)
@@ -365,3 +394,90 @@ class BufferedConsumer(object):
                 e.endpoint = endpoint
             buf = buf[self._max_size:]
         self._buffers[endpoint] = buf
+
+#! /usr/bin/env python
+#
+# Mixpanel, Inc. -- http://mixpanel.com/
+#
+# Python API client library to consume mixpanel.com analytics data.
+
+class MixpanelExporter(object):
+
+    ENDPOINT = 'http://mixpanel.com/api'
+    DATA_ENDPOINT = 'http://data.mixpanel.com/api'
+    VERSION = '2.0'
+
+    def __init__(self, api_key, api_secret, data=False):
+        self.api_key = api_key
+        self.api_secret = api_secret
+        self.endpoint = self.ENDPOINT
+        if data:
+            self.endpoint = self.DATA_ENDPOINT
+
+    def request(self, methods, params, format='json', read_byte_size=1024000):
+        """
+            methods - List of methods to be joined, e.g. ['events', 'properties', 'values']
+                      will give us http://mixpanel.com/api/2.0/events/properties/values/
+            params - Extra parameters associated with method
+        """
+        params['api_key'] = self.api_key
+        params['expire'] = int(time.time()) + 600   # Grant this request 10 minutes.
+        params['format'] = format
+        if 'sig' in params: del params['sig']
+        params['sig'] = self.hash_args(params)
+
+        request_url = '/'.join([self.endpoint, str(self.VERSION)] + methods) + '/?' + self.unicode_urlencode(params)
+
+        request = urllib.urlopen(request_url)
+
+        while True:
+            data = request.read(read_byte_size)
+            if len(data) == 0:
+                break
+            yield data
+
+
+    def unicode_urlencode(self, params):
+        """
+            Convert lists to JSON encoded strings, and correctly handle any
+            unicode URL parameters.
+        """
+        if isinstance(params, dict):
+            params = params.items()
+        for i, param in enumerate(params):
+            if isinstance(param[1], list):
+                params[i] = (param[0], json.dumps(param[1]),)
+
+        return urllib.urlencode(
+            [(k, isinstance(v, unicode) and v.encode('utf-8') or v) for k, v in params]
+        )
+
+    def hash_args(self, args, secret=None):
+        """
+            Hashes arguments by joining key=value pairs, appending a secret, and
+            then taking the MD5 hex digest.
+        """
+        for a in args:
+            if isinstance(args[a], list): args[a] = json.dumps(args[a])
+
+        args_joined = ''
+        for a in sorted(args.keys()):
+            if isinstance(a, unicode):
+                args_joined += a.encode('utf-8')
+            else:
+                args_joined += str(a)
+
+            args_joined += '='
+
+            if isinstance(args[a], unicode):
+                args_joined += args[a].encode('utf-8')
+            else:
+                args_joined += str(args[a])
+
+        hash = hashlib.md5(args_joined)
+
+        if secret:
+            hash.update(secret)
+        elif self.api_secret:
+            hash.update(self.api_secret)
+        return hash.hexdigest()
